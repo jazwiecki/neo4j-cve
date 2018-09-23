@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  neo4j:
+    image: neo4j:3.4.7
+    expose:
+      - 7474
+      - 7473
+      - 7687
+    ports:
+      - "7474:7474"
+      - "7473:7473"
+      - "7687:7687"
+    volumes:
+      - ./data:/data
+      - ./logs:/logs
