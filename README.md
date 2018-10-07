@@ -30,7 +30,7 @@ To run a query from within a session:
 
 ## Loading CVE Data
 
-`https://nvd.nist.gov/vuln/data-feeds#XML_FEED` lists all XML feeds of data.
+https://nvd.nist.gov/vuln/data-feeds#XML_FEED lists all XML feeds of data.
 
 Run this command to load a test file:
 ```
