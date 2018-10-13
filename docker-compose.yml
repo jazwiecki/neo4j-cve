@@ -4,7 +4,8 @@ services:
   neo4j:
     build: .
     environment:
-      NEO4J_AUTH: ${NEO4J_AUTH:-none}
+      - "NEO4J_AUTH=none"
+      - "NEO4J_dbms_security_procedures_unrestricted=apoc.*"
     expose:
       - 7474
       - 7473
