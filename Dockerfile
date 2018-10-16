@@ -7,3 +7,6 @@ RUN wget \
 
 RUN wget \
     http://jzw.s3.amazonaws.com/nvd-test.xml
+
+RUN wget \
+    http://jzw.s3.amazonaws.com/nvd-3-items.xml
