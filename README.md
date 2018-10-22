@@ -44,6 +44,8 @@ for more details on `apoc.load.xml`.
 
 ### Creating nodes
 
+With the newer XML loader:
+
 ```
 call apoc.load.xml("file:///var/lib/neo4j/nvd-3-items.xml", '/*/*', {}) YIELD value AS vuln
 UNWIND vuln._children AS vuln_children
@@ -51,11 +53,45 @@ WITH DISTINCT vuln, collect(apoc.map.fromPairs([attr IN vuln_children._children 
 MERGE (cve:CVE {
     name: vuln.name,
     severity: vuln.severity,
-    published: vuln.published,
-    cvss_score: vuln.CVSS_score,
+    published: toInteger(replace(vuln.published, '-', '')),
+    cvss_score: toFloat(vuln.CVSS_score),
     cvss_vector: vuln.CVSS_vector,
-    cvss_base_score: vuln.CVSS_base_score,
-    cvss_impact_subscore: vuln.CVSS_impact_subscore,
-    cvss_expoit_subscore: vuln.CVSS_exploit_subscore,
+    cvss_base_score: toFloat(vuln.CVSS_base_score),
+    cvss_impact_subscore: toFloat(vuln.CVSS_impact_subscore),
+    cvss_expoit_subscore: toFloat(vuln.CVSS_exploit_subscore),
     description: descript_text})
+```
+
+With xmlSimple:
+```
+call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
+UNWIND nvd._entry AS vuln
+MERGE (cve:CVE {
+    name: vuln.name,
+    severity: coalesce(vuln.severity, 'Unknown'),
+    published: toInteger(replace(vuln.published, '-', '')),
+    cvss_score: coalesce(toFloat(vuln.CVSS_score), -1),
+    cvss_vector: coalesce(vuln.CVSS_vector, 'Unknown'),
+    cvss_base_score: coalesce(toFloat(vuln.CVSS_base_score), -1),
+    cvss_impact_subscore: coalesce(toFloat(vuln.CVSS_impact_subscore), -1),
+    cvss_expoit_subscore: coalesce(toFloat(vuln.CVSS_exploit_subscore), -1),
+    description: vuln._desc._descript._text})
+
+ FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE loss_type <> '_type' | vuln._loss_types[loss_type]._type] |
+         MERGE (loss_type:LossType {name:vuln_loss_type})
+         MERGE (cve)-[:LOSES]->(loss_type))
+
+ FOREACH (vuln_range IN [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] |
+         MERGE (access_vector:AccessVector {name:vuln_range})
+         MERGE (cve)-[:ACCESSED_BY]->(access_vector))
+```
+
+
+get loss_types and range
+```
+call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
+UNWIND nvd._entry AS vuln
+RETURN vuln.name,
+    [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] AS vuln_ranges,
+    [loss_type IN keys(vuln._loss_types) WHERE loss_type <> '_type' | vuln._loss_types[loss_type]._type] AS vuln_loss_types
 ```
