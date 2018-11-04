@@ -77,9 +77,20 @@ MERGE (cve:CVE {
     cvss_expoit_subscore: coalesce(toFloat(vuln.CVSS_exploit_subscore), -1),
     description: vuln._desc._descript._text})
 
- FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE loss_type <> '_type' | vuln._loss_types[loss_type]._type] |
+// have to handle 'sec_prot' loss type differently
+// b/c it has information in an attribute of the node
+// (<sec_prot user="1"/>, <sec_prot admin="1"/>)
+// which we can't cleanly handle the same way, since
+// there isn't a good way to turn 'user' and 'admin'
+// into relationship attributes based on this XML format
+ FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE NOT loss_type IN ['_type', '_sec_prot'] | vuln._loss_types[loss_type]._type] |
          MERGE (loss_type:LossType {name:vuln_loss_type})
          MERGE (cve)-[:LOSES]->(loss_type))
+
+// now handle sec_prot loss types w/ special case
+FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE loss_type = '_sec_prot' | vuln._loss_types[loss_type]._type] |
+         MERGE (loss_type:LossType {name:vuln_loss_type})
+         MERGE (cve)-[:LOSES {scope:coalesce(replace(vuln._loss_types._sec_prot.user, '1', 'user'), replace(vuln._loss_types._sec_prot.admin, '1', 'admin'))}]->(loss_type))
 
  FOREACH (vuln_range IN [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] |
          MERGE (access_vector:AccessVector {name:vuln_range})
