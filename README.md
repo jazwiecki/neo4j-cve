@@ -64,6 +64,9 @@ MERGE (cve:CVE {
 
 With xmlSimple:
 ```
+USING PERIODIC COMMIT
+
+
 CALL apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
 UNWIND nvd._entry AS vuln
 MERGE (cve:CVE {
@@ -83,7 +86,7 @@ MERGE (cve:CVE {
 // which we can't cleanly handle the same way, since
 // there isn't a good way to turn 'user' and 'admin'
 // into relationship attributes based on this XML format
- FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE NOT loss_type IN ['_type', '_sec_prot'] | vuln._loss_types[loss_type]._type] |
+FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE NOT loss_type IN ['_type', '_sec_prot'] | vuln._loss_types[loss_type]._type] |
          MERGE (loss_type:LossType {name:vuln_loss_type})
          MERGE (cve)-[:LOSES]->(loss_type))
 
@@ -92,21 +95,24 @@ FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE loss_type 
          MERGE (loss_type:LossType {name:vuln_loss_type})
          MERGE (cve)-[:LOSES {scope:coalesce(replace(vuln._loss_types._sec_prot.user, '1', 'user'), replace(vuln._loss_types._sec_prot.admin, '1', 'admin'))}]->(loss_type))
 
- FOREACH (vuln_range IN [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] |
+FOREACH (vuln_range IN [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] |
          MERGE (access_vector:AccessVector {name:vuln_range})
          MERGE (cve)-[:ACCESSED_BY]->(access_vector))
 
-FOREACH (prod_vers in [vuln._vuln_soft._prod._vers] |
-        MERGE (product_version:ProductVersion {
-                                                name:prod_vers.num,
-                                                major_version: toInteger(split(prod_vers.num, '.')[0]),
-                                                edition: coalesce(prod_vers.edition, 'None')
-                                                })
-        MERGE (product:Product {name:vuln._vuln_soft._prod.name})
-        MERGE (vendor:Vendor {name:vuln._vuln_soft._prod.vendor})
-        MERGE (cve)-[:AFFECTS]->(product_version)
-        MERGE (product_version)-[:VERSION_OF]->(product)
-        MERGE (product)-[:MADE_BY]->(vendor))
+FOREACH (prod in vuln._vuln_soft._prod |
+         MERGE (product:Product {name:prod.name})
+         MERGE (vendor:Vendor {name:prod.vendor})
+         MERGE (product)-[:MADE_BY]->(vendor)
+
+         FOREACH (prod_vers in prod._vers |
+                MERGE (product_version:ProductVersion {
+                        name:prod_vers.num,
+                        major_version: coalesce(toInteger(split(prod_vers.num, '.')[0]), -1),
+                        edition: coalesce(prod_vers.edition, 'None')
+                        })
+                MERGE (cve)-[:AFFECTS]->(product_version)
+                MERGE (product_version)-[:VERSION_OF]->(product))
+        )
 ```
 
 
@@ -124,4 +130,9 @@ product versions
 call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
 UNWIND nvd._entry AS vuln
 RETURN vuln.name, vuln._vuln_soft._prod.name AS product, vuln._vuln_soft._prod.vendor AS vendor, [product_version IN vuln._vuln_soft._prod._vers | [toInteger(split(product_version.num,'.')[0]), product_version.edition] ] as pv
+```
+
+constraints automatically create indexes:
+```
+CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE
 ```
