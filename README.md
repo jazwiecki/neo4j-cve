@@ -64,7 +64,7 @@ MERGE (cve:CVE {
 
 With xmlSimple:
 ```
-call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
+CALL apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
 UNWIND nvd._entry AS vuln
 MERGE (cve:CVE {
     name: vuln.name,
@@ -95,6 +95,18 @@ FOREACH (vuln_loss_type IN [loss_type IN keys(vuln._loss_types) WHERE loss_type 
  FOREACH (vuln_range IN [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] |
          MERGE (access_vector:AccessVector {name:vuln_range})
          MERGE (cve)-[:ACCESSED_BY]->(access_vector))
+
+FOREACH (prod_vers in [vuln._vuln_soft._prod._vers] |
+        MERGE (product_version:ProductVersion {
+                                                name:prod_vers.num,
+                                                major_version: toInteger(split(prod_vers.num, '.')[0]),
+                                                edition: coalesce(prod_vers.edition, 'None')
+                                                })
+        MERGE (product:Product {name:vuln._vuln_soft._prod.name})
+        MERGE (vendor:Vendor {name:vuln._vuln_soft._prod.vendor})
+        MERGE (cve)-[:AFFECTS]->(product_version)
+        MERGE (product_version)-[:VERSION_OF]->(product)
+        MERGE (product)-[:MADE_BY]->(vendor))
 ```
 
 
@@ -105,4 +117,11 @@ UNWIND nvd._entry AS vuln
 RETURN vuln.name,
     [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] AS vuln_ranges,
     [loss_type IN keys(vuln._loss_types) WHERE loss_type <> '_type' | vuln._loss_types[loss_type]._type] AS vuln_loss_types
+```
+
+product versions
+```
+call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
+UNWIND nvd._entry AS vuln
+RETURN vuln.name, vuln._vuln_soft._prod.name AS product, vuln._vuln_soft._prod.vendor AS vendor, [product_version IN vuln._vuln_soft._prod._vers | [toInteger(split(product_version.num,'.')[0]), product_version.edition] ] as pv
 ```
