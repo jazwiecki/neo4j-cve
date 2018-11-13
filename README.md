@@ -64,9 +64,6 @@ MERGE (cve:CVE {
 
 With xmlSimple:
 ```
-USING PERIODIC COMMIT
-
-
 CALL apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
 UNWIND nvd._entry AS vuln
 MERGE (cve:CVE {
@@ -106,7 +103,8 @@ FOREACH (prod in vuln._vuln_soft._prod |
 
          FOREACH (prod_vers in prod._vers |
                 MERGE (product_version:ProductVersion {
-                        name:prod_vers.num,
+                        name:prod.name + '_' + prod_vers.num + '_' + prod_vers.edition,
+                        version:prod_vers.num,
                         major_version: coalesce(toInteger(split(prod_vers.num, '.')[0]), -1),
                         edition: coalesce(prod_vers.edition, 'None')
                         })
