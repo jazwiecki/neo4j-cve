@@ -64,7 +64,7 @@ MERGE (cve:CVE {
 
 With xmlSimple:
 ```
-CALL apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-test.xml") YIELD value AS nvd
+CALL apoc.load.xmlSimple('file:///var/lib/neo4j/nvd-test.xml') YIELD value AS nvd
 UNWIND nvd._entry AS vuln
 MERGE (cve:CVE {
     name: vuln.name,
@@ -79,7 +79,7 @@ MERGE (cve:CVE {
 
 // have to handle 'sec_prot' loss type differently
 // b/c it has information in an attribute of the node
-// (<sec_prot user="1"/>, <sec_prot admin="1"/>)
+// (<sec_prot user='1'/>, <sec_prot admin='1'/>)
 // which we can't cleanly handle the same way, since
 // there isn't a good way to turn 'user' and 'admin'
 // into relationship attributes based on this XML format
@@ -103,7 +103,7 @@ FOREACH (prod in vuln._vuln_soft._prod |
 
          FOREACH (prod_vers in prod._vers |
                 MERGE (product_version:ProductVersion {
-                        name:prod.name + '_' + prod_vers.num + '_' + prod_vers.edition,
+                        name:prod.name + '_' + prod_vers.num + '_' + COALESCE(prod_vers.edition,''),
                         version:prod_vers.num,
                         major_version: coalesce(toInteger(split(prod_vers.num, '.')[0]), -1),
                         edition: coalesce(prod_vers.edition, 'None')
@@ -133,4 +133,9 @@ RETURN vuln.name, vuln._vuln_soft._prod.name AS product, vuln._vuln_soft._prod.v
 constraints automatically create indexes:
 ```
 CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE
+```
+
+using periodic commits:
+```
+CALL apoc.periodic.commit("<CYPHER STATEMENT>", {batchSize:1000, parallel:false})
 ```
