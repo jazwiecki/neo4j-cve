@@ -44,6 +44,19 @@ for more details on `apoc.load.xml`.
 
 ### Creating nodes
 
+With `apoc.load.json`:
+```
+CALL apoc.load.json('file:///var/lib/neo4j/nvd-3.json') YIELD value AS nvd
+UNWIND nvd.CVE_Items as cve
+MERGE (cve:CVE {
+    name: cve.cve.CVE_data_meta.ID
+    base_severity: cve.impact.baseMetricV3.cvssV3.baseSeverity
+
+    })
+
+return cve.cve.CVE_data_meta.ID, keys(cve.cve)
+```
+
 With the newer XML loader:
 
 ```
@@ -112,7 +125,6 @@ FOREACH (prod in vuln._vuln_soft._prod |
                 MERGE (product_version)-[:VERSION_OF]->(product))
         )
 ```
-
 
 get loss_types and range
 ```
