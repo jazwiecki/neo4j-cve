@@ -1,5 +1,10 @@
-[
-  {
+{
+  "CVE_data_type" : "CVE",
+  "CVE_data_format" : "MITRE",
+  "CVE_data_version" : "4.0",
+  "CVE_data_numberOfCVEs" : "15077",
+  "CVE_data_timestamp" : "2018-11-15T08:06Z",
+  "CVE_Items" : [ {
     "cve": {
       "data_type": "CVE",
       "data_format": "MITRE",
@@ -554,3 +559,4 @@
     "lastModifiedDate": "2018-10-12T22:15Z"
   }
 ]
+}
