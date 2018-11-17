@@ -46,7 +46,7 @@ for more details on `apoc.load.xml`.
 
 With `apoc.load.json`:
 ```
-CALL apoc.load.json('file:///var/lib/neo4j/nvd-3.json') YIELD value AS nvd
+CALL apoc.load.json('file:///var/lib/neo4j/nvd-300.json') YIELD value AS nvd
 UNWIND nvd.CVE_Items as vuln
 MERGE (cve:CVE {
     attack_complexity: vuln.impact.baseMetricV3.cvssV3.attackComplexity,
