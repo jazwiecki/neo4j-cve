@@ -44,23 +44,54 @@ for more details on `apoc.load.xml`.
 
 ### Creating nodes
 
-With the newer XML loader:
-
+With `apoc.load.json`:
 ```
-call apoc.load.xml("file:///var/lib/neo4j/nvd-3-items.xml", '/*/*', {}) YIELD value AS vuln
-UNWIND vuln._children AS vuln_children
-WITH DISTINCT vuln, collect(apoc.map.fromPairs([attr IN vuln_children._children WHERE attr._type in ['descript'] | [attr._type, attr._text]]).descript) AS descript_text
+CALL apoc.load.json('file:///var/lib/neo4j/nvd-300.json') YIELD value AS nvd
+UNWIND nvd.CVE_Items as vuln
 MERGE (cve:CVE {
-    name: vuln.name,
-    severity: vuln.severity,
-    published: toInteger(replace(vuln.published, '-', '')),
-    cvss_score: toFloat(vuln.CVSS_score),
-    cvss_vector: vuln.CVSS_vector,
-    cvss_base_score: toFloat(vuln.CVSS_base_score),
-    cvss_impact_subscore: toFloat(vuln.CVSS_impact_subscore),
-    cvss_expoit_subscore: toFloat(vuln.CVSS_exploit_subscore),
-    description: descript_text})
+    attack_complexity: vuln.impact.baseMetricV3.cvssV3.attackComplexity,
+    availability_impact: vuln.impact.baseMetricV3.cvssV3.availabilityImpact,
+    base_score: vuln.impact.baseMetricV3.cvssV3.baseScore,
+    base_severity: vuln.impact.baseMetricV3.cvssV3.baseSeverity,
+    confidentiality_impact: vuln.impact.baseMetricV3.cvssV3.confidentialityImpact,
+    description: [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
+    exploitability_score: vuln.impact.baseMetricV3.exploitabilityScore,
+    impact_score: vuln.impact.baseMetricV3.impactScore,
+    integrity_impact: vuln.impact.baseMetricV3.cvssV3.integrityImpact,
+    name: vuln.cve.CVE_data_meta.ID,
+    privileges_required: vuln.impact.baseMetricV3.cvssV3.privilegesRequired,
+    published: apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
+    scope: vuln.impact.baseMetricV3.cvssV3.scope,
+    user_interaction: vuln.impact.baseMetricV3.cvssV3.userInteraction
+    })
+
+MERGE (cvss:CVSS {
+    name: apoc.text.replace(vuln.impact.baseMetricV3.cvssV3.vectorString,'CVSS\\:3\\.0\\/','')
+    })
+    MERGE (cve)-[:IS_ENCODED_AS]->(cvss)
+
+MERGE (attack_vector:AttackVector {name: vuln.impact.baseMetricV3.cvssV3.attackVector})
+MERGE (cve)-[:IS_ATTACKABLE_THROUGH]-(attack_vector)
+
+FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
+        MERGE (vendor:Vendor {name: vendor_data.vendor_name})
+
+        FOREACH (product_data IN vendor_data.product.product_data |
+            MERGE (product:Product {name: product_data.product_name})
+            MERGE (product)-[:MADE_BY]->(vendor)
+
+            FOREACH (version_data IN product_data.version.version_data |
+                MERGE (product_version:ProductVersion {
+                    name: vendor_data.vendor_name + '_' + product_data.product_name + '_' + version_data.version_affected + version_data.version_value,
+                    version_value: version_data.version_value
+                    })
+                MERGE (product_version)-[:VERSION_OF]-(product)
+                MERGE (cve)-[:AFFECTS]->(product_version))
+            )
+    )
 ```
+
+
 
 With xmlSimple:
 ```
@@ -113,7 +144,6 @@ FOREACH (prod in vuln._vuln_soft._prod |
         )
 ```
 
-
 get loss_types and range
 ```
 call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
@@ -138,4 +168,23 @@ CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE
 using periodic commits:
 ```
 CALL apoc.periodic.commit("<CYPHER STATEMENT>", {batchSize:1000, parallel:false})
+```
+
+
+With the newer XML loader:
+
+```
+call apoc.load.xml("file:///var/lib/neo4j/nvd-3-items.xml", '/*/*', {}) YIELD value AS vuln
+UNWIND vuln._children AS vuln_children
+WITH DISTINCT vuln, collect(apoc.map.fromPairs([attr IN vuln_children._children WHERE attr._type in ['descript'] | [attr._type, attr._text]]).descript) AS descript_text
+MERGE (cve:CVE {
+    name: vuln.name,
+    severity: vuln.severity,
+    published: toInteger(replace(vuln.published, '-', '')),
+    cvss_score: toFloat(vuln.CVSS_score),
+    cvss_vector: vuln.CVSS_vector,
+    cvss_base_score: toFloat(vuln.CVSS_base_score),
+    cvss_impact_subscore: toFloat(vuln.CVSS_impact_subscore),
+    cvss_expoit_subscore: toFloat(vuln.CVSS_exploit_subscore),
+    description: descript_text})
 ```
