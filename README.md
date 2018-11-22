@@ -49,29 +49,33 @@ With `apoc.load.json`:
 CALL apoc.load.json('file:///var/lib/neo4j/nvd-300.json') YIELD value AS nvd
 UNWIND nvd.CVE_Items as vuln
 MERGE (cve:CVE {
-    attack_complexity: vuln.impact.baseMetricV3.cvssV3.attackComplexity,
-    availability_impact: vuln.impact.baseMetricV3.cvssV3.availabilityImpact,
-    base_score: vuln.impact.baseMetricV3.cvssV3.baseScore,
-    base_severity: vuln.impact.baseMetricV3.cvssV3.baseSeverity,
-    confidentiality_impact: vuln.impact.baseMetricV3.cvssV3.confidentialityImpact,
+    attack_complexity: COALESCE(vuln.impact.baseMetricV3.cvssV3.attackComplexity, 'NA'),
+    availability_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.availabilityImpact, 'NA'),
+    base_score: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseScore, -1),
+    base_severity: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseSeverity, 'NA'),
+    confidentiality_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.confidentialityImpact, 'NA'),
     description: [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
-    exploitability_score: vuln.impact.baseMetricV3.exploitabilityScore,
-    impact_score: vuln.impact.baseMetricV3.impactScore,
-    integrity_impact: vuln.impact.baseMetricV3.cvssV3.integrityImpact,
+    exploitability_score: COALESCE(vuln.impact.baseMetricV3.exploitabilityScore, -1),
+    impact_score: COALESCE(vuln.impact.baseMetricV3.impactScore, -1),
+    integrity_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.integrityImpact, 'NA'),
     name: vuln.cve.CVE_data_meta.ID,
-    privileges_required: vuln.impact.baseMetricV3.cvssV3.privilegesRequired,
+    privileges_required: COALESCE(vuln.impact.baseMetricV3.cvssV3.privilegesRequired, 'NA'),
     published: apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
-    scope: vuln.impact.baseMetricV3.cvssV3.scope,
-    user_interaction: vuln.impact.baseMetricV3.cvssV3.userInteraction
+    scope: COALESCE(vuln.impact.baseMetricV3.cvssV3.scope, 'NA'),
+    user_interaction: COALESCE(vuln.impact.baseMetricV3.cvssV3.userInteraction, 'NA')
     })
 
-MERGE (cvss:CVSS {
-    name: apoc.text.replace(vuln.impact.baseMetricV3.cvssV3.vectorString,'CVSS\\:3\\.0\\/','')
-    })
+FOREACH (cvss_vector_string IN vuln.impact.baseMetricV3.cvssV3.vectorString |
+    MERGE (cvss:CVSS {
+        name: apoc.text.replace(cvss_vector_string,'CVSS\\:3\\.0\\/','')
+        })
     MERGE (cve)-[:IS_ENCODED_AS]->(cvss)
+    )
 
-MERGE (attack_vector:AttackVector {name: vuln.impact.baseMetricV3.cvssV3.attackVector})
-MERGE (cve)-[:IS_ATTACKABLE_THROUGH]-(attack_vector)
+FOREACH (cve_attack_vector IN vuln.impact.baseMetricV3.cvssV3.attackVector |
+    MERGE (attack_vector:AttackVector {name: cve_attack_vector})
+    MERGE (cve)-[:IS_ATTACKABLE_THROUGH]-(attack_vector)
+    )
 
 FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
         MERGE (vendor:Vendor {name: vendor_data.vendor_name})
