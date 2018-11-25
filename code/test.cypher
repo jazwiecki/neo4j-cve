@@ -1,3 +1,5 @@
+USING PERIODIC COMMIT;
+
 CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE;
 CREATE CONSTRAINT ON (cvss:CVSS) ASSERT cvss.name IS UNIQUE;
 CREATE CONSTRAINT ON (attack_vector:AttackVector) ASSERT attack_vector.name IS UNIQUE;
@@ -26,7 +28,7 @@ MERGE (cve:CVE {
 
 FOREACH (cvss_vector_string IN vuln.impact.baseMetricV3.cvssV3.vectorString |
     MERGE (cvss:CVSS {
-        name: apoc.text.replace(cvss_vector_string,'CVSS\\:3\\.0\\/','')
+        name: apoc.text.replace(cvss_vector_string,'CVSS:3.0/','')
         })
     MERGE (cve)-[:IS_ENCODED_AS]->(cvss)
     )
