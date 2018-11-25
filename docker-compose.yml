@@ -17,7 +17,7 @@ services:
       - "7473:7473"
       - "7687:7687"
     volumes:
+      - ./code:/var/lib/neo4j/code
+      - ./conf:/var/lib/neo4j/conf
       - ./data:/data
       - ./logs:/logs
-      - ./conf:/conf
-      - ./code:/code
