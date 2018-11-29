@@ -1,4 +1,4 @@
-# import os
+import os
 import re
 import requests
 import subprocess
@@ -9,8 +9,6 @@ nvd_data_feeds_url = 'https://nvd.nist.gov/vuln/data-feeds'
 
 # get gzipped json data URLs for years 2000-2999
 nvd_json_pattern = re.compile('(https:\/\/nvd\.nist\.gov\/feeds\/json\/cve\/1\.0\/nvdcve-1\.0-2\d{3}.json.gz)')
-
-cypher_file_name = 'load_nvd.cypher'
 
 nvd_cypher_template = Template('''
 CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE;
@@ -70,13 +68,14 @@ FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
 ''')
 
 if __name__ == '__main__':
-    nvd_json_files = re.finditer(nvd_json_pattern, nvd_feeds_page.content.decode('utf-8'))
+    print(f'Fetching NVD json feed URLs from {nvd_data_feeds_url}')
     nvd_feeds_page = requests.get(nvd_data_feeds_url)
+    nvd_json_files = re.finditer(nvd_json_pattern, nvd_feeds_page.content.decode('utf-8'))
     if nvd_feeds_page.status_code == 200:
         for nvd_file_url_match in nvd_json_files:
             nvd_file_url = nvd_file_url_match.group(0)
             nvd_file_name_gzip = nvd_file_url.split('/')[-1]
-            nvd_file_name = nvd_file_name.strip('.gz')
+            nvd_file_name = nvd_file_name_gzip.strip('.gz')
             print(f'Fetching {nvd_file_name_gzip}')
             nvd_file_contents = requests.get(nvd_file_url, stream=True)
             if nvd_file_contents.status_code == 200:
@@ -88,10 +87,14 @@ if __name__ == '__main__':
                 subprocess.run(['gunzip', nvd_file_name_gzip])
             else:
                 print(f'Error fetching {nvd_file_contents}')
-            # cypher_file = open(cypher_file_name, 'w')
-            # cypher_file.write(nvd_cypher_template.safe_substitute(nvd_file_name = nvd_file_name))
-            # cypher_file.close()
             print(f'Loading {nvd_file_name} to Neo4j')
-            subprocess.run([''])
+            cypher_shell_result = subprocess.run(['cypher-shell'],
+                                                input=nvd_cypher_template.safe_substitute(nvd_file_name = nvd_file_name).encode('utf-8'),
+                                                stdout = subprocess.PIPE)
+            os.remove(nvd_file_name)
+            if cypher_shell_result.returncode == 0:
+                print(f'Successfully loaded {nvd_file_name}')
+            else:
+                sys.exit('Error loading {}'.format(nvd_file_name))
     else:
         sys.exit('Error fetching NVD data feeds page.')
