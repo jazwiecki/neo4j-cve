@@ -2,6 +2,7 @@ import os
 import re
 import requests
 import subprocess
+import sys
 
 from string import Template
 
@@ -69,6 +70,7 @@ FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
 
 if __name__ == '__main__':
     print(f'Fetching NVD json feed URLs from {nvd_data_feeds_url}')
+    sys.stdout.flush()
     nvd_feeds_page = requests.get(nvd_data_feeds_url)
     nvd_json_files = re.finditer(nvd_json_pattern, nvd_feeds_page.content.decode('utf-8'))
     if nvd_feeds_page.status_code == 200:
@@ -77,6 +79,7 @@ if __name__ == '__main__':
             nvd_file_name_gzip = nvd_file_url.split('/')[-1]
             nvd_file_name = nvd_file_name_gzip.strip('.gz')
             print(f'Fetching {nvd_file_name_gzip}')
+            sys.stdout.flush()
             nvd_file_contents = requests.get(nvd_file_url, stream=True)
             if nvd_file_contents.status_code == 200:
                 with open(nvd_file_name_gzip, 'wb') as nvd_file:
@@ -88,13 +91,14 @@ if __name__ == '__main__':
             else:
                 print(f'Error fetching {nvd_file_contents}')
             print(f'Loading {nvd_file_name} to Neo4j')
+            sys.stdout.flush()
             cypher_shell_result = subprocess.run(['cypher-shell'],
                                                 input=nvd_cypher_template.safe_substitute(nvd_file_name = nvd_file_name).encode('utf-8'),
-                                                stdout = subprocess.PIPE)
+                                                stdout = subprocess.PIPE, stderr = subprocess.PIPE)
             os.remove(nvd_file_name)
             if cypher_shell_result.returncode == 0:
                 print(f'Successfully loaded {nvd_file_name}')
             else:
-                sys.exit('Error loading {}'.format(nvd_file_name))
+                sys.exit('Error loading {}: {}'.format(nvd_file_name, cypher_shell_result))
     else:
         sys.exit('Error fetching NVD data feeds page.')
