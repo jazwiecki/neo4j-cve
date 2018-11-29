@@ -102,3 +102,4 @@ if __name__ == '__main__':
                 sys.exit('Error loading {}: {}'.format(nvd_file_name, cypher_shell_result))
     else:
         sys.exit('Error fetching NVD data feeds page.')
+    print('Finished loading NVD json.')
