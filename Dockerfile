@@ -23,7 +23,3 @@ RUN echo "dbms.security.auth_enabled=false" >> /var/lib/neo4j/conf/neo4j.conf &&
 WORKDIR /var/lib/neo4j/
 
 RUN neo4j stop
-
-#RUN pip3 install -r requirements.txt
-
-#RUN python3 nvd_loader.py
