@@ -1,6 +1,12 @@
 # neo4j-cve
 Graph database version of the CVE database
 
+## Setup
+
+1. Run `docker-compose build` to download the Neo4j Docker image and install the APOC plugin
+2. Run `docker-compose up` to start Neo4j
+3. Run `docker exec -t nvdgraph python3 code/nvd_loader.py` to load the NVD data feeds
+
 ## Starting Neo4j
 
 Run `docker-compose up` to start the container.
