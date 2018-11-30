@@ -15,11 +15,4 @@ WORKDIR /var/lib/neo4j/code
 
 RUN pip3 install -r requirements.txt
 
-RUN echo "dbms.security.auth_enabled=false" >> /var/lib/neo4j/conf/neo4j.conf && \
-    echo "apoc.import.file.enabled=true" >> /var/lib/neo4j/conf/neo4j.conf && \
-    neo4j start && \
-    python3 nvd_loader.py
-
 WORKDIR /var/lib/neo4j/
-
-RUN neo4j stop
