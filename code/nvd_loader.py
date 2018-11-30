@@ -19,7 +19,7 @@ CREATE CONSTRAINT ON (vendor:Vendor) ASSERT vendor.name IS UNIQUE;
 CREATE CONSTRAINT ON (product:Product) ASSERT product.name IS UNIQUE;
 CREATE CONSTRAINT ON (product_version:ProductVersion) ASSERT product_version.name IS UNIQUE;
 
-CALL apoc.load.json('file:///var/lib/neo4j/code/$nvd_file_name') YIELD value AS nvd
+CALL apoc.load.json('file:///var/lib/neo4j/$nvd_file_name') YIELD value AS nvd
 UNWIND nvd.CVE_Items as vuln
 MERGE (cve:CVE {
     attack_complexity: COALESCE(vuln.impact.baseMetricV3.cvssV3.attackComplexity, 'NA'),
