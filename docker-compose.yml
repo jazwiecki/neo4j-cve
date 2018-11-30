@@ -3,6 +3,7 @@ version: '3'
 services:
   neo4j:
     build: .
+    container_name: nvdgraph
     environment:
       NEO4J_AUTH: ${NEO4J_AUTH:-none}
       NEO4J_dbms_memory_pagecache_size: 2G
