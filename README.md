@@ -23,7 +23,7 @@ export NEO4J_AUTH="admin/password"
 
 ## Python Setup
 
-Create a virtual environment and run `pip install -r requirements.txt`.
+Create a virtual environment and run `pip install -r code/requirements.txt`.
 
 ## Python Usage
 
