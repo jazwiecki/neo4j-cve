@@ -1,5 +1,8 @@
 # neo4j-cve
-Graph database version of the CVE database
+Graph database version of the [NVD CVE database](http://nvd.nist.gov) by
+Jim Jazwiecki and Nathan Kluth, built using [the official Neo4j Docker image](https://neo4j.com/developer/docker/)
+([GitHub](https://github.com/neo4j/docker-neo4j)). Please post feedback/questions
+as GitHub issues.
 
 ## Setup
 
@@ -9,7 +12,14 @@ Graph database version of the CVE database
 
 ## Starting Neo4j
 
-Run `docker-compose up` to start the container.
+Run `docker-compose up` to start the container. Open [http://localhost:7474/browser/](http://localhost:7474/browser/)
+to start an interactive browser-based session. By default, there is no authentication
+set, but it can be set in Docker from your local environent by setting the
+`NEO4J_AUTH` environment variable to a `username/password` pair. For example:
+
+```
+export NEO4J_AUTH="admin/password"
+```
 
 ## Python Setup
 
@@ -36,7 +46,17 @@ To run a query from within a session:
 
 ## Loading CVE Data
 
-https://nvd.nist.gov/vuln/data-feeds#XML_FEED lists all XML feeds of data.
+https://nvd.nist.gov/vuln/data-feeds lists all feeds of data. `nvd_loader.py` will
+fetch this page, parse it to identify complete (i.e. not partial/update) v1.0 gzipped
+JSON feed URLs, fetch the files one by one, unpack, and load them using the template
+specified in `loader-template.cypher`.
+
+### loader-tempalte.cypher
+
+First, the script will set uniqueness constraints on our nodes, implicitly creating
+indices. `$nvd_file_name` will be replaced during execution with the name of the
+JSON file being loaded. Then we loop over all the individual CVEs.
+
 
 ### Exploring data
 Run this command to load a test file:

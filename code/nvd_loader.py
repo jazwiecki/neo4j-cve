@@ -6,69 +6,34 @@ import sys
 
 from string import Template
 
-nvd_data_feeds_url = 'https://nvd.nist.gov/vuln/data-feeds'
-
-# get gzipped json data URLs for years 2000-2999
-nvd_json_pattern = re.compile('(https:\/\/nvd\.nist\.gov\/feeds\/json\/cve\/1\.0\/nvdcve-1\.0-2\d{3}.json.gz)')
-
-nvd_cypher_template = Template('''
-CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE;
-CREATE CONSTRAINT ON (cvss:CVSS) ASSERT cvss.name IS UNIQUE;
-CREATE CONSTRAINT ON (attack_vector:AttackVector) ASSERT attack_vector.name IS UNIQUE;
-CREATE CONSTRAINT ON (vendor:Vendor) ASSERT vendor.name IS UNIQUE;
-CREATE CONSTRAINT ON (product:Product) ASSERT product.name IS UNIQUE;
-CREATE CONSTRAINT ON (product_version:ProductVersion) ASSERT product_version.name IS UNIQUE;
-
-CALL apoc.load.json('file:///var/lib/neo4j/$nvd_file_name') YIELD value AS nvd
-UNWIND nvd.CVE_Items as vuln
-MERGE (cve:CVE {
-    attack_complexity: COALESCE(vuln.impact.baseMetricV3.cvssV3.attackComplexity, 'NA'),
-    availability_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.availabilityImpact, 'NA'),
-    base_score: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseScore, -1),
-    base_severity: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseSeverity, 'NA'),
-    confidentiality_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.confidentialityImpact, 'NA'),
-    description: [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
-    exploitability_score: COALESCE(vuln.impact.baseMetricV3.exploitabilityScore, -1),
-    impact_score: COALESCE(vuln.impact.baseMetricV3.impactScore, -1),
-    integrity_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.integrityImpact, 'NA'),
-    name: vuln.cve.CVE_data_meta.ID,
-    privileges_required: COALESCE(vuln.impact.baseMetricV3.cvssV3.privilegesRequired, 'NA'),
-    published: apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
-    scope: COALESCE(vuln.impact.baseMetricV3.cvssV3.scope, 'NA'),
-    user_interaction: COALESCE(vuln.impact.baseMetricV3.cvssV3.userInteraction, 'NA')
-    })
-
-FOREACH (cvss_vector_string IN vuln.impact.baseMetricV3.cvssV3.vectorString |
-    MERGE (cvss:CVSS {
-        name: apoc.text.replace(cvss_vector_string,'CVSS:3.0/','')
-        })
-    MERGE (cve)-[:IS_ENCODED_AS]->(cvss)
-    )
-
-FOREACH (cve_attack_vector IN vuln.impact.baseMetricV3.cvssV3.attackVector |
-    MERGE (attack_vector:AttackVector {name: cve_attack_vector})
-    MERGE (cve)-[:IS_ATTACKABLE_THROUGH]-(attack_vector)
-    )
-
-FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
-        MERGE (vendor:Vendor {name: vendor_data.vendor_name})
-
-        FOREACH (product_data IN vendor_data.product.product_data |
-            MERGE (product:Product {name: product_data.product_name})
-            MERGE (product)-[:MADE_BY]->(vendor)
-
-            FOREACH (version_data IN product_data.version.version_data |
-                MERGE (product_version:ProductVersion {
-                    name: vendor_data.vendor_name + '_' + product_data.product_name + '_' + version_data.version_affected + version_data.version_value,
-                    version_value: version_data.version_value
-                    })
-                MERGE (product_version)-[:VERSION_OF]-(product)
-                MERGE (cve)-[:AFFECTS]->(product_version))
-            )
-    );
-''')
+def load_template(filename):
+    if os.path.isfile(filename):
+        with open(filename, 'r') as template_file:
+            template_string = template_file.read()
+            if template_string:
+                return Template(template_string)
 
 if __name__ == '__main__':
+
+    ######
+    # initialize a couple variables
+
+    nvd_data_feeds_url = 'https://nvd.nist.gov/vuln/data-feeds'
+
+    # this template is specific to the 1.0 version of the NVD JSON feed
+    nvd_cypher_template = load_template('code/loader-template.cypher')
+
+
+    # this pattern will get gzipped json data URLs for years 2000-2999
+    # hard-coding the version number in the file name pattern as "1.0"
+    # should help ensure that this script doesn't process any NVD feeds
+    # that don't match the pattern expected in nvd_cypher_template
+    nvd_json_pattern = re.compile('(https:\/\/nvd\.nist\.gov\/feeds\/json\/cve\/1\.0\/nvdcve-1\.0-2\d{3}.json.gz)')
+
+    # end variable initialization
+    ######
+
+
     print(f'Fetching NVD json feed URLs from {nvd_data_feeds_url}')
     sys.stdout.flush()
     nvd_feeds_page = requests.get(nvd_data_feeds_url)
