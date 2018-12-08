@@ -36,7 +36,17 @@ To run a query from within a session:
 
 ## Loading CVE Data
 
-https://nvd.nist.gov/vuln/data-feeds#XML_FEED lists all XML feeds of data.
+https://nvd.nist.gov/vuln/data-feeds lists all feeds of data. `nvd_loader.py` will
+fetch this page, parse it to identify complete (i.e. not partial/update) v1.0 gzipped
+JSON feed URLs, fetch the files one by one, unpack, and load them using the template
+specified in `loader-template.cypher`.
+
+### loader-tempalte.cypher
+
+First, the script will set uniqueness constraints on our nodes, implicitly creating
+indices. `$nvd_file_name` will be replaced during execution with the name of the
+JSON file being loaded. Then we loop over all the individual CVEs.
+
 
 ### Exploring data
 Run this command to load a test file:
