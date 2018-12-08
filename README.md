@@ -23,7 +23,11 @@ export NEO4J_AUTH="admin/password"
 
 ## Python Setup
 
-Create a virtual environment and run `pip install -r code/requirements.txt`.
+There are two different Python environments used in this project. `code/requirements.txt`
+is used by the Neo4j container to load the NVD data to Neo4j, but doesn't include the
+Python Neo4j driver, because it is not needed by `nvd_loader.py`. To work with
+the Neo4j database locally using Python and the official Neo4j Python package,
+create a virtual environment and run `pip install -r requirements.txt`.
 
 ## Python Usage
 
