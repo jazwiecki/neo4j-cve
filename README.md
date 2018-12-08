@@ -1,5 +1,7 @@
 # neo4j-cve
-Graph database version of the CVE database
+Graph database version of the [NVD CVE database](http://nvd.nist.gov) by
+Jim Jazwiecki and Nathan Kluth, built using [the official Neo4j Docker image](https://neo4j.com/developer/docker/)
+([Github](https://github.com/neo4j/docker-neo4j)).
 
 ## Setup
 
@@ -9,7 +11,14 @@ Graph database version of the CVE database
 
 ## Starting Neo4j
 
-Run `docker-compose up` to start the container.
+Run `docker-compose up` to start the container. Open [http://localhost:7474/browser/](http://localhost:7474/browser/)
+to start an interactive browser-based session. By default, there is no authentication
+set, but it can be set in Docker from your local environent by setting the
+`NEO4J_AUTH` environment variable to a `username/password` pair. For example:
+
+```
+export NEO4J_AUTH="admin/password"
+```
 
 ## Python Setup
 
