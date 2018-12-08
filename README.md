@@ -1,7 +1,8 @@
 # neo4j-cve
 Graph database version of the [NVD CVE database](http://nvd.nist.gov) by
 Jim Jazwiecki and Nathan Kluth, built using [the official Neo4j Docker image](https://neo4j.com/developer/docker/)
-([Github](https://github.com/neo4j/docker-neo4j)).
+([GitHub](https://github.com/neo4j/docker-neo4j)). Please post feedback/questions
+as GitHub issues.
 
 ## Setup
 
