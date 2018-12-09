@@ -1,34 +1,3 @@
-// uniqueness constraints implicitly create indexes
-CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE;
-CREATE CONSTRAINT ON (attack_vector:AttackVector) ASSERT attack_vector.name IS UNIQUE;
-CREATE CONSTRAINT ON (vendor:Vendor) ASSERT vendor.name IS UNIQUE;
-CREATE CONSTRAINT ON (product:Product) ASSERT product.name IS UNIQUE;
-CREATE CONSTRAINT ON (product_version:ProductVersion) ASSERT product_version.name IS UNIQUE;
-
-// explicitly create other non-unique indices on CVE
-// we are going to create a lot b/c, as a research
-// tool this should have a lot of potential entry points
-// (e.g. search might start w/ all CVEs that do not require
-// user interaction, or have a base_score over 9.)
-// *Not* creating an index on the CVE text description,
-// because this is not a document store, and if you want
-// full text search to find your CVEs, you should probably
-// use nvd.nist.gov.
-CREATE INDEX ON :CVE(attack_complexity);
-CREATE INDEX ON :CVE(availability_impact);
-CREATE INDEX ON :CVE(base_score);
-CREATE INDEX ON :CVE(base_severity);
-CREATE INDEX ON :CVE(confidentiality_impact);
-CREATE INDEX ON :CVE(exploitability_score);
-CREATE INDEX ON :CVE(impact_score);
-CREATE INDEX ON :CVE(integrity_impact);
-CREATE INDEX ON :CVE(privileges_required);
-CREATE INDEX ON :CVE(published);
-CREATE INDEX ON :CVE(scope);
-CREATE INDEX ON :CVE(user_interaction);
-CREATE INDEX ON :CVE(vector_string);
-CREATE INDEX ON :CVE(`v2.vector_string`);
-
 // the 'nvd_file_name' string below will be replaced by the loader script
 // for each file
 CALL apoc.load.json('file:///var/lib/neo4j/$nvd_file_name') YIELD value AS nvd
@@ -42,21 +11,34 @@ UNWIND nvd.CVE_Items as vuln
 // existing node for a given CVE ID, then fail b/c we're violating the
 // uniqueness constraint
 MERGE (cve:CVE { name: vuln.cve.CVE_data_meta.ID })
-SET cve.attack_complexity = COALESCE(vuln.impact.baseMetricV3.cvssV3.attackComplexity, 'NA'),
-    cve.availability_impact = COALESCE(vuln.impact.baseMetricV3.cvssV3.availabilityImpact, 'NA'),
-    cve.base_score = COALESCE(vuln.impact.baseMetricV3.cvssV3.baseScore, -1),
-    cve.base_severity = COALESCE(vuln.impact.baseMetricV3.cvssV3.baseSeverity, 'NA'),
-    cve.confidentiality_impact = COALESCE(vuln.impact.baseMetricV3.cvssV3.confidentialityImpact, 'NA'),
-    cve.description = [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
-    cve.exploitability_score = COALESCE(vuln.impact.baseMetricV3.exploitabilityScore, -1),
-    cve.impact_score = COALESCE(vuln.impact.baseMetricV3.impactScore, -1),
-    cve.integrity_impact = COALESCE(vuln.impact.baseMetricV3.cvssV3.integrityImpact, 'NA'),
-    cve.privileges_required = COALESCE(vuln.impact.baseMetricV3.cvssV3.privilegesRequired, 'NA'),
+SET cve.description = [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
     cve.published = apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
-    cve.scope = COALESCE(vuln.impact.baseMetricV3.cvssV3.scope, 'NA'),
-    cve.user_interaction = COALESCE(vuln.impact.baseMetricV3.cvssV3.userInteraction, 'NA')
-    cve.vector_string = apoc.text.replace(COALESCE(vuln.impact.baseMetricV3.cvssV3.vectorString, 'NA'),'CVSS:3.0/',''),
-    cve.`v2.vector_string` = COALESCE(vuln.impact.baseMetricV2.cvssV2.vectorString, 'NA')
+    cve.`v2.access_complexity` = vuln.impact.baseMetricV2.cvssV2.accessComplexity,
+    cve.`v2.authentication` = vuln.impact.baseMetricV2.cvssV2.authentication,
+    cve.`v2.availability_impact` = vuln.impact.baseMetricV2.cvssV2.availabilityImpact,
+    cve.`v2.base_score` = vuln.impact.baseMetricV2.cvssV2.baseScore,
+    cve.`v2.confidentiality_impact` = vuln.impact.baseMetricV2.cvssV2.confidentialityImpact,
+    cve.`v2.exploitability_score` = vuln.impact.baseMetricV2.exploitabilityScore,
+    cve.`v2.impact_score` = vuln.impact.baseMetricV2.impactScore,
+    cve.`v2.integrity_impact` = vuln.impact.baseMetricV2.cvssV2.integrityImpact,
+    cve.`v2.severity` = vuln.impact.baseMetricV2.severity,
+    cve.`v2.obtain_all_privilege` = vuln.impact.baseMetricV2.obtainAllPrivilege,
+    cve.`v2.obtain_other_privilege` = vuln.impact.baseMetricV2.obtainOtherPrivilege,
+    cve.`v2.obtain_user_privilege` = vuln.impact.baseMetricV2.obtainUserPrivilege,
+    cve.`v2.user_interaction_required` = vuln.impact.baseMetricV2.userInteractionRequired,
+    cve.`v2.vector_string` = vuln.impact.baseMetricV2.cvssV2.vectorString,
+    cve.`v3.attack_complexity` = vuln.impact.baseMetricV3.cvssV3.attackComplexity,
+    cve.`v3.availability_impact` = vuln.impact.baseMetricV3.cvssV3.availabilityImpact,
+    cve.`v3.base_score` = vuln.impact.baseMetricV3.cvssV3.baseScore,
+    cve.`v3.base_severity` = vuln.impact.baseMetricV3.cvssV3.baseSeverity,
+    cve.`v3.confidentiality_impact` = vuln.impact.baseMetricV3.cvssV3.confidentialityImpact,
+    cve.`v3.exploitability_score` = vuln.impact.baseMetricV3.exploitabilityScore,
+    cve.`v3.impact_score` = vuln.impact.baseMetricV3.impactScore,
+    cve.`v3.integrity_impact` = vuln.impact.baseMetricV3.cvssV3.integrityImpact,
+    cve.`v3.privileges_required` = vuln.impact.baseMetricV3.cvssV3.privilegesRequired,
+    cve.`v3.scope` = vuln.impact.baseMetricV3.cvssV3.scope,
+    cve.`v3.user_interaction` = vuln.impact.baseMetricV3.cvssV3.userInteraction,
+    cve.`v3.vector_string` = vuln.impact.baseMetricV3.cvssV3.vectorString
 
 FOREACH (cve_attack_vector IN vuln.impact.baseMetricV3.cvssV3.attackVector |
     MERGE (attack_vector:AttackVector {name: cve_attack_vector})
