@@ -1,6 +1,5 @@
 // uniqueness constraints implicitly create indexes
 CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE;
-CREATE CONSTRAINT ON (cvss:CVSS) ASSERT cvss.name IS UNIQUE;
 CREATE CONSTRAINT ON (attack_vector:AttackVector) ASSERT attack_vector.name IS UNIQUE;
 CREATE CONSTRAINT ON (vendor:Vendor) ASSERT vendor.name IS UNIQUE;
 CREATE CONSTRAINT ON (product:Product) ASSERT product.name IS UNIQUE;
@@ -27,6 +26,8 @@ CREATE INDEX ON :CVE(privileges_required);
 CREATE INDEX ON :CVE(published);
 CREATE INDEX ON :CVE(scope);
 CREATE INDEX ON :CVE(user_interaction);
+CREATE INDEX ON :CVE(vector_string);
+CREATE INDEX ON :CVE(`v2.vector_string`);
 
 // the 'nvd_file_name' string below will be replaced by the loader script
 // for each file
@@ -54,17 +55,17 @@ SET cve.attack_complexity = COALESCE(vuln.impact.baseMetricV3.cvssV3.attackCompl
     cve.published = apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
     cve.scope = COALESCE(vuln.impact.baseMetricV3.cvssV3.scope, 'NA'),
     cve.user_interaction = COALESCE(vuln.impact.baseMetricV3.cvssV3.userInteraction, 'NA')
-
-FOREACH (cvss_vector_string IN vuln.impact.baseMetricV3.cvssV3.vectorString |
-    MERGE (cvss:CVSS {
-        name: apoc.text.replace(cvss_vector_string,'CVSS:3.0/','')
-        })
-    MERGE (cve)-[:ENCODED_AS]->(cvss)
-    )
+    cve.vector_string = apoc.text.replace(COALESCE(vuln.impact.baseMetricV3.cvssV3.vectorString, 'NA'),'CVSS:3.0/',''),
+    cve.`v2.vector_string` = COALESCE(vuln.impact.baseMetricV2.cvssV2.vectorString, 'NA')
 
 FOREACH (cve_attack_vector IN vuln.impact.baseMetricV3.cvssV3.attackVector |
     MERGE (attack_vector:AttackVector {name: cve_attack_vector})
-    MERGE (cve)-[:ATTACKABLE_THROUGH]->(attack_vector)
+    MERGE (cve)-[:ATTACKABLE_THROUGH {cvss_version: 3}]->(attack_vector)
+    )
+
+FOREACH (cve_access_vector IN vuln.impact.baseMetricV2.cvssV2.accessVector |
+    MERGE (access_vector:AttackVector {name: cve_access_vector})
+    MERGE (cve)-[:ATTACKABLE_THROUGH {cvss_version: 2}]->(access_vector)
     )
 
 FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
