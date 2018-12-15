@@ -46,7 +46,7 @@ Then, to create a new session:
 
 To run a query from within a session:
 
-```s.run("CREATE (a:Greeting) SET a.message = 'Hello World' RETURN a.message + ', from node ' + id(a)")```
+```s.run("MATCH n RETURN n LIMIT 25")```
 
 ## Loading CVE Data
 
@@ -74,101 +74,95 @@ RETURN vuln
 See https://neo4j-contrib.github.io/neo4j-apoc-procedures/
 for more details on `apoc.load.json`.
 
-### Creating nodes
+### Sample queries
 
-With `apoc.load.json`:
+Calculate the number of vulnerabilities found in the same software with
+the same impact score:
 ```
-CALL apoc.load.json('file:///var/lib/neo4j/code/nvd-test-samples.json') YIELD value AS nvd
-UNWIND nvd.CVE_Items as vuln
-MERGE (cve:CVE {
-    attack_complexity: COALESCE(vuln.impact.baseMetricV3.cvssV3.attackComplexity, 'NA'),
-    availability_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.availabilityImpact, 'NA'),
-    base_score: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseScore, -1),
-    base_severity: COALESCE(vuln.impact.baseMetricV3.cvssV3.baseSeverity, 'NA'),
-    confidentiality_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.confidentialityImpact, 'NA'),
-    description: [desc IN vuln.cve.description.description_data WHERE desc.lang = 'en'| desc.value],
-    exploitability_score: COALESCE(vuln.impact.baseMetricV3.exploitabilityScore, -1),
-    impact_score: COALESCE(vuln.impact.baseMetricV3.impactScore, -1),
-    integrity_impact: COALESCE(vuln.impact.baseMetricV3.cvssV3.integrityImpact, 'NA'),
-    name: vuln.cve.CVE_data_meta.ID,
-    privileges_required: COALESCE(vuln.impact.baseMetricV3.cvssV3.privilegesRequired, 'NA'),
-    published: apoc.date.fromISO8601(apoc.text.replace(vuln.publishedDate,'Z$',':00Z')),
-    scope: COALESCE(vuln.impact.baseMetricV3.cvssV3.scope, 'NA'),
-    user_interaction: COALESCE(vuln.impact.baseMetricV3.cvssV3.userInteraction, 'NA')
-    })
+MATCH
+    ( vendor : Vendor {name : ’ microsoft ’})
+        −[:MADE BY]−
+    ( product : Product {name: ’edge ’})
+        −[:VERSION OF]−
+    (product version:ProductVersion)
+        −[:AFFECTS]− ( cve :CVE)
+RETURN cve.‘v2.impact score ‘, count(cve)
+```
 
-FOREACH (cvss_vector_string IN vuln.impact.baseMetricV3.cvssV3.vectorString |
-    MERGE (cvss:CVSS {
-        name: apoc.text.replace(cvss_vector_string,'CVSS\\:3\\.0\\/','')
-        })
-    MERGE (cve)-[:IS_ENCODED_AS]->(cvss)
+Calculate the number of vulnerabilities found in the same software with
+the same impact score across two consecutive years:
+```
+UNWIND range(1988, 2018, 1) AS t
+WITH
+    apoc.date.fromISO8601(t + '-01-01T00:00:00.000Z')
+        AS start_window,
+    apoc.date.fromISO8601((t + 1) + '-12-31T23:59:59.999Z')
+        AS end_window
+MATCH
+    (vendor: Vendor)
+        -[:MADE_BY]-
+    (product:Product)
+        -[:VERSION_OF]-
+    (product_version:ProductVersion)
+        -[:AFFECTS]-
+    (cve:CVE)
+WHERE
+    cve.published >= start_window
+        AND
+    cve.published <= end_window
+RETURN
+    apoc.date.format(start_window)
+        AS start_window,
+    apoc.date.format(end_window)
+        AS end_window,
+    vendor.name,
+    product.name,
+    cve.`v2.impact_score`
+        AS impact_score,
+    count(cve) AS vulnerabilties
+ORDER BY
+    start_window,
+    vendor.name,
+    product.name
+```
+
+Find count of vulnerabilities that require user interaction through the
+network, under the CVSS 3.0 definition of "attack vector"
+```
+MATCH
+    (attack_vector:AttackVector {name: 'NETWORK'})
+        -[:ATTACKABLE_THROUGH {cvss_version: 3}]-
+    (cve:CVE {`v3.user_interaction`: 'REQUIRED'})
+RETURN count(cve)
+```
+
+Identify easy network-accessible exploits that don't involve user actions
+which simplify access to high-impact exploits which are otherwise high-complexity:
+
+```
+MATCH
+    (attack_vector:AttackVector {
+            name: 'NETWORK'
+        }
     )
-
-FOREACH (cve_attack_vector IN vuln.impact.baseMetricV3.cvssV3.attackVector |
-    MERGE (attack_vector:AttackVector {name: cve_attack_vector})
-    MERGE (cve)-[:IS_ATTACKABLE_THROUGH]-(attack_vector)
+        -[:ATTACKABLE_THROUGH]-
+    (cve:CVE {
+        `v3.scope`: 'CHANGED',
+        `v3.user_interaction`: 'NONE',
+        `v3.attack_complexity`: 'LOW'
+        }
     )
-
-FOREACH (vendor_data IN vuln.cve.affects.vendor.vendor_data |
-        MERGE (vendor:Vendor {name: vendor_data.vendor_name})
-
-        FOREACH (product_data IN vendor_data.product.product_data |
-            MERGE (product:Product {name: product_data.product_name})
-            MERGE (product)-[:MADE_BY]->(vendor)
-
-            FOREACH (version_data IN product_data.version.version_data |
-                MERGE (product_version:ProductVersion {
-                    name: vendor_data.vendor_name + '_' + product_data.product_name + '_' + version_data.version_affected + version_data.version_value,
-                    version_value: version_data.version_value
-                    })
-                MERGE (product_version)-[:VERSION_OF]-(product)
-                MERGE (cve)-[:AFFECTS]->(product_version))
-            )
+        -[:AFFECTS]-
+    (product_version:ProductVersion)
+        -[:AFFECTS]-
+    (escalated_cve:CVE {
+        `v3.privileges_required`: 'HIGH',
+        `v3.user_interaction`: 'NONE',
+        `v3.integrity_impact`: 'HIGH'}
     )
-```
-
-
-get loss_types and range
-```
-call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
-UNWIND nvd._entry AS vuln
-RETURN vuln.name,
-    [vuln_range IN keys(vuln._range) WHERE vuln_range <> '_type' | vuln._range[vuln_range]._type] AS vuln_ranges,
-    [loss_type IN keys(vuln._loss_types) WHERE loss_type <> '_type' | vuln._loss_types[loss_type]._type] AS vuln_loss_types
-```
-
-product versions
-```
-call apoc.load.xmlSimple("file:///var/lib/neo4j/nvd-3-items.xml") YIELD value AS nvd
-UNWIND nvd._entry AS vuln
-RETURN vuln.name, vuln._vuln_soft._prod.name AS product, vuln._vuln_soft._prod.vendor AS vendor, [product_version IN vuln._vuln_soft._prod._vers | [toInteger(split(product_version.num,'.')[0]), product_version.edition] ] as pv
-```
-
-constraints automatically create indexes:
-```
-CREATE CONSTRAINT ON (cve:CVE) ASSERT cve.name IS UNIQUE
-```
-
-using periodic commits:
-```
-CALL apoc.periodic.commit("<CYPHER STATEMENT>", {batchSize:1000, parallel:false})
-```
-
-
-With the newer XML loader:
-
-```
-call apoc.load.xml("file:///var/lib/neo4j/nvd-3-items.xml", '/*/*', {}) YIELD value AS vuln
-UNWIND vuln._children AS vuln_children
-WITH DISTINCT vuln, collect(apoc.map.fromPairs([attr IN vuln_children._children WHERE attr._type in ['descript'] | [attr._type, attr._text]]).descript) AS descript_text
-MERGE (cve:CVE {
-    name: vuln.name,
-    severity: vuln.severity,
-    published: toInteger(replace(vuln.published, '-', '')),
-    cvss_score: toFloat(vuln.CVSS_score),
-    cvss_vector: vuln.CVSS_vector,
-    cvss_base_score: toFloat(vuln.CVSS_base_score),
-    cvss_impact_subscore: toFloat(vuln.CVSS_impact_subscore),
-    cvss_expoit_subscore: toFloat(vuln.CVSS_exploit_subscore),
-    description: descript_text})
+        -[:ATTACKABLE_THROUGH]-
+   (escalacted_vector:AttackVector {name: 'LOCAL'})
+RETURN cve.name,
+    product_version.name,
+    escalated_cve.name
 ```
