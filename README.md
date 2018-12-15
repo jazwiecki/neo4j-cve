@@ -80,12 +80,13 @@ Calculate the number of vulnerabilities found in the same software with
 the same impact score:
 ```
 MATCH
-    ( vendor : Vendor {name : ’ microsoft ’})
+    (vendor : Vendor {name : ’ microsoft ’})
         −[:MADE BY]−
-    ( product : Product {name: ’edge ’})
+    (product : Product {name: ’edge ’})
         −[:VERSION OF]−
     (product version:ProductVersion)
-        −[:AFFECTS]− ( cve :CVE)
+        −[:AFFECTS]−
+    (cve :CVE)
 RETURN cve.‘v2.impact score ‘, count(cve)
 ```
 
