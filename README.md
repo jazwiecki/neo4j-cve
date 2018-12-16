@@ -48,14 +48,34 @@ To run a query from within a session:
 
 ```s.run("MATCH n RETURN n LIMIT 25")```
 
-## Loading CVE Data
+## NVD CVE Data
+
+### Schema
+
+Details on specific field mappings are `code/loader-template.cypher`, but broadly the
+schema is as follows:
+
+```
+(AttackVector) 
+    -[:ATTACKABLE_THROUGH]-
+(CVE)
+    -[:AFFECTS]-
+(ProductVersion)
+    -[:VERSION_OF]-
+(Product)
+    -[:MADE_BY]-
+(Vendor)
+
+```
+
+### Loading CVE Data
 
 https://nvd.nist.gov/vuln/data-feeds lists all feeds of data. `nvd_loader.py` will
 fetch this page, parse it to identify complete (i.e. not partial/update) v1.0 gzipped
 JSON feed URLs, fetch the files one by one, unpack, and load them using the template
 specified in `loader-template.cypher`.
 
-### loader-template.cypher
+#### loader-template.cypher
 
 First, the script will set uniqueness constraints on our nodes, implicitly creating
 indices. `$nvd_file_name` will be replaced during execution with the name of the
